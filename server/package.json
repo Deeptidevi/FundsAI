@@ -1,0 +1,36 @@
+{
+  "name": "@gmaps/server",
+  "version": "1.0.0",
+  "description": "G-MAPS Industrial Intelligence & Outreach Server",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "node --test dist/**/*.test.js",
+    "test:outreach": "tsx src/testOutreachSuite.ts"
+  },
+  "dependencies": {
+    "@gmaps/shared": "file:../shared",
+    "@google/genai": "^2.32.0",
+    "@hono/node-server": "^1.13.7",
+    "better-sqlite3": "^11.8.1",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.7",
+    "hono": "^4.6.14",
+    "imapflow": "^2.10.0",
+    "mailparser": "^3.14.1",
+    "nodemailer": "^6.9.16",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/mailparser": "^3.9.0",
+    "@types/node": "^22.10.2",
+    "@types/nodemailer": "^6.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

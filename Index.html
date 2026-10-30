@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G-MAPS Industrial Company Finder</title>
+  
+  <!-- Modern Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <?!= include('Styles'); ?>
+
+  <!-- Leaflet Free Interactive Map SDK (100% Free, Zero Billing, No Popups) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    if (typeof L === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"><\/script>');
+      document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">');
+    }
+  </script>
+</head>
+<body>
+  <div class="enterprise-app">
+    
+    <!-- Compact Left Navigation Sidebar -->
+    <aside class="enterprise-sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">🏭</div>
+        <div class="sidebar-brand-text">
+          <div class="sidebar-brand-title">G-MAPS Industrial</div>
+          <div class="sidebar-brand-sub">Intelligence DB & CRM</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="sidebar-section-label">OPERATIONS</div>
+        <a href="#section-location" class="nav-item active" id="nav-link-location">
+          <span class="nav-icon">📍</span>
+          <span class="nav-text">Location & Map</span>
+        </a>
+        <a href="#section-action" class="nav-item" id="nav-link-action">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-text">Perimeter Discovery</span>
+        </a>
+        <a href="#section-results" class="nav-item" id="nav-link-results">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Industrial Units</span>
+          <span class="nav-badge" id="sidebar-leads-count">0</span>
+        </a>
+
+        <div class="sidebar-section-label" style="margin-top: 16px;">MANAGEMENT</div>
+        <a href="javascript:void(0)" class="nav-item" onclick="openSpreadsheetModal()">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">Spreadsheet DB ↗</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="openApiKeyModal()">
+          <span class="nav-icon">🔑</span>
+          <span class="nav-text">API Key & Quota</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="toggleAdvancedOptions()">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Diagnostics</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-status-box" onclick="openApiKeyModal()" title="Google Places API Status">
+          <span class="status-indicator"></span>
+          <span style="font-size: 11px; font-weight: 600; color: #334155;">Places API Active</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="enterprise-main">
+      
+      <!-- Professional Compact Header -->
+      <header class="enterprise-header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <span class="breadcrumb-root">Industrial Intelligence</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="header-loc-crumb">Select Search Centre</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <div class="status-badge active" id="header-api-status" onclick="openApiKeyModal()" style="cursor: pointer;" title="Click to view API Key & Quota">
+            <span class="status-indicator"></span> Google Places API Connected
+          </div>
+
+          <button type="button" class="btn btn-outline btn-sm" id="btn-api-key-manager" onclick="openApiKeyModal()" style="border-color: #f59e0b; color: #b45309; background: #fffbeb; font-weight: 700;">
+            🔑 API Key & Quota
+          </button>
+          
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-open-spreadsheet" onclick="handleOpenGoogleSpreadsheet()">
+            📊 Open Spreadsheet ↗
+          </button>
+
+          <button type="button" class="btn btn-outline btn-sm" id="btn-toggle-advanced" onclick="toggleAdvancedOptions()">
+            ⚙️ Diagnostics
+          </button>
+        </div>
+      </header>
+
+      <!-- 4 Compact KPI Summary Cards -->
+      <section class="kpi-cards-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background: #eff6ff; color: #2563eb;">📍</div>
+          <div class="kpi-content">
+            <div class="kpi-label">SEARCH CENTRE</div>
+            <div class="kpi-val" id="kpi-target-centre">Not Selected</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background: #f0fdf4; color: #16a34a;">📏</div>
+          <div class="kpi-content">
+            <div class="kpi-label">DISCOVERY PERIMETER</div>
+            <div class="kpi-val" id="kpi-perimeter">3.0 km (MSME)</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background: #f8fafc; color: #0284c7;">🏭</div>
+          <div class="kpi-content">
+            <div class="kpi-label">DISCOVERED UNITS</div>
+            <div class="kpi-val" id="kpi-discovered-units">0 Units</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background: #fffbeb; color: #d97706;">⭐</div>
+          <div class="kpi-content">
+            <div class="kpi-label">QUALIFIED LEADS</div>
+            <div class="kpi-val" id="kpi-qualified-leads">0 Qualified</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PART A: ACTION CARDS (PRESERVED IN DOM FOR BACKWARDS COMPATIBILITY) -->
+      <section class="action-cards-grid" id="action-cards-section" style="display: none;">
+        <div class="action-card" id="card-action-nearby" onclick="handleActionCard('NEARBY')">
+          <div class="action-card-title">1. Find Nearby Industries</div>
+        </div>
+        <div class="action-card" id="card-action-sectors" onclick="handleActionCard('SECTORS')">
+          <div class="action-card-title">2. Explore Industrial Sectors</div>
+        </div>
+        <div class="action-card" id="card-action-verify" onclick="handleActionCard('VERIFY')">
+          <div class="action-card-title">3. Verify Company Details</div>
+        </div>
+        <div class="action-card" id="card-action-area" onclick="handleActionCard('AREA')">
+          <div class="action-card-title">4. Explore Search Area</div>
+        </div>
+        <div class="action-card" id="card-action-history" onclick="handleActionCard('HISTORY')">
+          <div class="action-card-title">5. Previous Searches</div>
+        </div>
+        <div class="action-card" id="card-action-export" onclick="handleActionCard('EXPORT')">
+          <div class="action-card-title">6. Export Company Data</div>
+        </div>
+      </section>
+
+    <!-- SECTION A: FIND A LOCATION OR COORDINATES -->
+    <section class="section-card" id="section-location">
+      <div class="section-header">
+        <div class="section-number">A</div>
+        <div style="flex: 1;">
+          <h2 class="section-title">Find a Location or Coordinates</h2>
+          <p class="section-desc">Search by company/locality name or paste exact geographic coordinates to establish the search centre</p>
+        </div>
+      </div>
+
+      <!-- Mode Switcher Tabs -->
+      <div class="loc-mode-switcher">
+        <button type="button" class="loc-mode-btn active" id="btn-mode-name" onclick="switchLocationMode('name')">
+          🏢 Search by Company / Area Name
+        </button>
+        <button type="button" class="loc-mode-btn" id="btn-mode-coords" onclick="switchLocationMode('coords')">
+          🌐 Search by Coordinates (Lat, Lng)
+        </button>
+      </div>
+
+      <!-- Mode 1: Search by Name / Locality -->
+      <div id="mode-name-container">
+        <div class="location-search-box">
+          <div class="search-input-group">
+            <span class="search-icon">🔍</span>
+            <input 
+              type="text" 
+              id="location-search-input" 
+              class="prominent-input" 
+              placeholder="Enter a company, area, or location (e.g. Balewadi, Bhosari MIDC, Peenya, Pune)..." 
+              autocomplete="off"
+            >
+            <button type="button" class="btn btn-primary" id="btn-search-location" onclick="handleLocationInputSearch()">
+              Resolve Location
+            </button>
+          </div>
+
+          <!-- Suggestions dropdown -->
+          <div id="location-suggestions" class="suggestions-container" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- Mode 2: Search by Coordinates -->
+      <div id="mode-coords-container" style="display: none;" class="coords-panel">
+        <div class="coords-info-alert">
+          <span>📐 <strong>Geographic Coordinates Search:</strong> Paste comma-separated pair (e.g. <code>18.5204, 73.8567</code>) or enter Latitude (-90 to 90) and Longitude (-180 to 180).</span>
+        </div>
+
+        <div class="coords-form-grid">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="coord-paste-input">Paste Pair (Auto-Parses):</label>
+            <input type="text" id="coord-paste-input" class="form-control" placeholder="e.g. 18.5204, 73.8567" oninput="handleCoordinatePaste(this.value)" autocomplete="off">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="coord-lat-input">Latitude (-90 to 90):</label>
+            <input type="number" step="any" id="coord-lat-input" class="form-control" placeholder="e.g. 18.5204" autocomplete="off">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="coord-lng-input">Longitude (-180 to 180):</label>
+            <input type="number" step="any" id="coord-lng-input" class="form-control" placeholder="e.g. 73.8567" autocomplete="off">
+          </div>
+        </div>
+
+        <div id="coord-error-msg" class="coord-inline-error" style="display: none;"></div>
+
+        <div class="coords-btn-row">
+          <button type="button" class="btn btn-primary" id="btn-search-coords" onclick="executeCoordinateSearch()">
+            🎯 Set Coordinates & Discover Companies
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="clearCoordinateInputs()">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Confirmed Location Badge -->
+      <div id="confirmed-location-card" class="confirmed-location-card" style="display: none;">
+        <div class="loc-details">
+          <div class="loc-status-tag">
+            <span class="pulse-dot"></span> Confirmed Search Centre
+          </div>
+          <div class="loc-name" id="loc-display-name">Awaiting Selection</div>
+          <div class="loc-meta">
+            <span class="meta-pill" id="loc-display-coords">Lat: --, Lng: --</span>
+            <span class="meta-pill" id="loc-display-place-id">Place ID: --</span>
+            <span class="meta-pill" id="loc-display-status">Verified via Geocoding API</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="clearConfirmedLocation()">
+          Change Location
+        </button>
+      </div>
+
+      <!-- Smart Regional Industrial Cluster Recommendation (e.g. Balewadi -> Bhosari MIDC) -->
+      <div id="cluster-recommendation-banner" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="font-size: 12px; color: #1e40af; line-height: 1.4; flex: 1; min-width: 260px;">
+          💡 <span id="cluster-rec-text">Area is primarily an IT & Corporate Hub. Heavy manufacturing plants are located in nearby industrial estates.</span>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-cluster-expand" onclick="expandToNearbyMidcCluster()" style="padding: 6px 14px; font-size: 11px; white-space: nowrap;">
+          🚀 Expand to Nearby MIDC (10 km) ➔
+        </button>
+      </div>
+
+      <!-- Simple Interactive Map & Perimeter -->
+      <div class="map-wrapper">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; flex-wrap: wrap; gap: 8px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>📍 Search Perimeter Map (1,000 m Radius)</span>
+            <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Click map or drag pin to move)</span>
+          </div>
+          <div class="map-layer-selector">
+            <button type="button" class="layer-btn active-layer" id="btn-layer-street" onclick="switchMapLayer('STREET')">🗺️ Street Map</button>
+            <button type="button" class="layer-btn" id="btn-layer-satellite" onclick="switchMapLayer('SATELLITE')">🛰️ Satellite</button>
+            <button type="button" class="layer-btn" id="btn-layer-topo" onclick="switchMapLayer('TOPO')">🏔️ Topo</button>
+            <button type="button" class="layer-btn" id="btn-layer-google" onclick="switchMapLayer('GOOGLE')">🌐 Google Maps</button>
+          </div>
+        </div>
+        <div id="location-map-container" class="location-map"></div>
+        <div class="map-radius-badge">
+          <span>📍 <strong>Search Centre:</strong> <span id="map-centre-text">Please enter or select a location above</span></span>
+          <span>🎯 <strong>Search Radius:</strong> <span id="map-radius-text">3,000 metres (3 km) circle perimeter</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION B: FIND NEARBY INDUSTRIAL COMPANIES & MSMES -->
+    <section class="section-card action-section" id="section-action">
+      <div class="section-header">
+        <div class="section-number">B</div>
+        <div>
+          <h2 class="section-title">Find Nearby Industrial Companies & MSMEs</h2>
+          <p class="section-desc">Executes authentic Indian industrial, engineering, fabrication & MSME discovery around your selected location</p>
+        </div>
+      </div>
+
+      <div class="search-action-bar">
+        <button type="button" class="btn btn-primary btn-hero" id="btn-run-1km-search" onclick="execute1KmIndustrialSearch()">
+          Find Industrial Companies & MSMEs
+        </button>
+        <div class="radius-selector-group">
+          <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-left: 6px;">Radius:</span>
+          <button type="button" class="radius-btn" id="rad-btn-1000" onclick="setSearchRadius(1000)">1 km</button>
+          <button type="button" class="radius-btn active" id="rad-btn-3000" onclick="setSearchRadius(3000)">3 km (MSME)</button>
+          <button type="button" class="radius-btn" id="rad-btn-5000" onclick="setSearchRadius(5000)">5 km</button>
+          <button type="button" class="radius-btn" id="rad-btn-10000" onclick="setSearchRadius(10000)">10 km</button>
+        </div>
+        <div class="search-params-pill">
+          <span>📏 Radius: <b id="display-search-radius">3.0 km (3,000 m)</b></span>
+          <span>•</span>
+          <span>🏭 Filter: <b>Indian MSME & Industrial Only</b></span>
+          <span>•</span>
+          <span>📐 Great-Circle Distance: <b id="display-radius-perimeter">Verified &le; 3,000 m</b></span>
+        </div>
+      </div>
+
+      <!-- Simple Loading Progress Indicator -->
+      <div id="search-progress-box" class="search-progress-card" style="display: none;">
+        <div class="spinner"></div>
+        <div class="progress-details">
+          <div class="progress-title" id="progress-title-text">Querying Google Places API...</div>
+          <div class="progress-subtitle" id="progress-desc-text">Retrieving industrial categories and calculating precise distances within 1 km...</div>
+        </div>
+      </div>
+
+      <!-- Understandable Error & Retry Card -->
+      <div id="search-error-box" class="search-error-card" style="display: none;">
+        <div class="error-icon">⚠️</div>
+        <div class="error-details">
+          <div class="error-title" id="error-title-text">Search Error</div>
+          <div class="error-message" id="error-desc-text">API or quota error details.</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="execute1KmIndustrialSearch()">
+          Retry Search
+        </button>
+      </div>
+    </section>
+
+    <!-- SECTION C: RESULTS -->
+    <section class="section-card" id="section-results">
+      <div class="section-header" style="justify-content: space-between; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="section-number">C</div>
+          <div>
+            <h2 class="section-title">
+              Discovered Industrial Companies
+              <span class="count-badge" id="results-count-badge">0 Companies</span>
+            </h2>
+            <p class="section-desc">Verified industrial units strictly within 1 km with Haversine distance & data source transparency</p>
+          </div>
+        </div>
+
+        <div class="results-actions-group">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="exportResultsAsCsv()">
+            📥 Download CSV
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="exportResultsAsJson()">
+            📋 Download JSON
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="loadCompanies()">
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="results-controls-bar">
+        <!-- Search within results -->
+        <div class="filter-search-box">
+          <span class="filter-search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="table-filter-input" 
+            class="filter-input" 
+            placeholder="Search within results (company, address, sector)..."
+          >
+        </div>
+
+        <!-- Filter by Industrial Relevance -->
+        <div class="filter-select-group">
+          <label class="filter-label" for="filter-relevance">Relevance:</label>
+          <select id="filter-relevance" class="filter-select" onchange="applyTableFilters()">
+            <option value="ALL">All Industrial Units</option>
+            <option value="HIGH">High Relevance (OEMs / Factories / CNC)</option>
+            <option value="MEDIUM">Medium Relevance</option>
+            <option value="REVIEW">Needs Review Queue</option>
+          </select>
+        </div>
+
+        <!-- Filter by CRM Lead Status -->
+        <div class="filter-select-group">
+          <label class="filter-label" for="filter-lead-status">Lead Status:</label>
+          <select id="filter-lead-status" class="filter-select" onchange="applyTableFilters()">
+            <option value="ALL">All Statuses</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+
+        <!-- Sort by Industrial Keywords in Name -->
+        <div class="filter-select-group">
+          <label class="filter-label" for="table-sort-order">Sort By:</label>
+          <select id="table-sort-order" class="filter-select" onchange="applyTableFilters()">
+            <option value="KEYWORD_RELEVANCE">🏭 Industrial Keywords in Name</option>
+            <option value="DISTANCE_ASC">📍 Distance (Closest First)</option>
+            <option value="NAME_ASC">🔤 Company Name (A-Z)</option>
+            <option value="RATING_DESC">⭐ Rating & Reviews</option>
+          </select>
+        </div>
+
+        <!-- Tier Pills (Optional classification without dominating) -->
+        <div class="filter-tier-pills" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="tier-pill active" data-tier="ALL" onclick="filterByTier('ALL')">All Tiers</button>
+          <button type="button" class="tier-pill" data-tier="Gold" onclick="filterByTier('Gold')">⭐ Gold</button>
+          <button type="button" class="tier-pill" data-tier="Silver" onclick="filterByTier('Silver')">🛡️ Silver</button>
+          <button type="button" class="tier-pill" data-tier="Bronze" onclick="filterByTier('Bronze')">🏭 Bronze</button>
+          <button type="button" class="tier-pill tier-info-btn" onclick="openTierGuideModal()" title="View Exact Tier Classification Rules & Criteria" style="background: #f1f5f9; color: #475569; border: 1px dashed #cbd5e1; margin-left: 6px; cursor: pointer;">
+            ℹ️ Tier Guide
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Table -->
+      <div class="table-container">
+        <table class="clean-table" id="companies-table">
+          <thead>
+            <tr>
+              <th style="width: 36px;">#</th>
+              <th>Company Name</th>
+              <th>Industry / Sector</th>
+              <th>Distance</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>Website</th>
+              <th>Rating & Reviews</th>
+              <th>Google Maps</th>
+              <th>Verification</th>
+              <th style="width: 105px;">Lead Status</th>
+              <th>Data Source</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="companies-table-body">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination / Summary Footer -->
+      <div class="table-pagination-footer">
+        <div id="pagination-summary">Showing 0 of 0 companies</div>
+        <div class="pagination-controls">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-prev-page" onclick="changePage(-1)" disabled>Previous</button>
+          <span id="pagination-page-num" style="font-weight: 600;">Page 1 of 1</span>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-next-page" onclick="changePage(1)" disabled>Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPTIONAL EXPANDABLE SECTION: ADVANCED OPTIONS & DIAGNOSTICS -->
+    <section class="advanced-options-card" id="advanced-options-section" style="display: none;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+          ⚙️ Advanced Configuration, Diagnostics & Acceptance Tests
+        </h3>
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleAdvancedOptions()">Close</button>
+      </div>
+
+      <div class="advanced-grid">
+        <!-- Box 1: Acceptance Test Suite -->
+        <div class="adv-box">
+          <div class="adv-box-title">System Acceptance Tests</div>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
+            Run automated verification: location separation (Balewadi vs Bhosari), 1 km Haversine perimeter, duplicate detection, and LockService integrity.
+          </p>
+          <button type="button" class="btn btn-primary btn-sm" onclick="runSystemAcceptanceTests()">
+            Run All Acceptance Tests
+          </button>
+          <div id="test-results-log" style="margin-top: 10px; font-size: 11px; max-height: 180px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- Box 2: API & Key Diagnostics -->
+        <div class="adv-box">
+          <div class="adv-box-title">API & Cloud Diagnostics</div>
+          <div style="font-size: 11px; display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary);">
+            <div>• <b>Google Places Web Service:</b> <span id="diag-places-status">Checking...</span></div>
+            <div>• <b>Google Maps JS API Key:</b> <span id="diag-js-key-status">Checking...</span></div>
+            <div>• <b>Google Sheets Database:</b> <span id="diag-sheets-status">Connected</span></div>
+            <div>• <b>Last Search Session ID:</b> <span id="diag-session-id">None</span></div>
+          </div>
+        </div>
+
+        <!-- Box 3: Search Metadata & Schema Export -->
+        <div class="adv-box">
+          <div class="adv-box-title">Location Intelligence JSON (Schema 1.0)</div>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
+            Download complete structured JSON schema with boundary coordinates, search metadata, and verified industrial records.
+          </p>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openLocationJsonViewer()">
+            View Location JSON
+          </button>
+        </div>
+      </div>
+    </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL 1: INDUSTRIAL SECTORS EXPLORER (FOR CARD 2) -->
+  <div class="drawer-backdrop" id="sectors-modal-backdrop" onclick="closeSectorsModal()"></div>
+  <div class="action-modal-box" id="sectors-modal" style="display: none;">
+    <div class="action-modal-header">
+      <div class="action-modal-title">
+        <span>🏭</span> Explore Industrial Sectors
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeSectorsModal()">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        Click any industrial sector below to filter discovered companies by that specialization:
+      </p>
+      <div id="sectors-list-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="clearSectorFilter()">Clear Sector Filter</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="closeSectorsModal()">Done</button>
+    </div>
+  </div>
+
+  <!-- MODAL 2: PREVIOUS SEARCHES HISTORY (FOR CARD 5) -->
+  <div class="drawer-backdrop" id="history-modal-backdrop" onclick="closeHistoryModal()"></div>
+  <div class="action-modal-box" id="history-modal" style="display: none; width: 700px;">
+    <div class="action-modal-header">
+      <div class="action-modal-title">
+        <span>🕒</span> Previous Search Sessions
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeHistoryModal()">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <div id="history-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-primary btn-sm" onclick="closeHistoryModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- MODAL 3: EXPORT OPTIONS (FOR CARD 6) -->
+  <div class="drawer-backdrop" id="export-modal-backdrop" onclick="closeExportModal()"></div>
+  <div class="action-modal-box" id="export-modal" style="display: none; width: 500px;">
+    <div class="action-modal-header">
+      <div class="action-modal-title">
+        <span>📥</span> Export Company Data
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeExportModal()">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        Choose an export format for currently filtered verified industrial companies:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="btn btn-primary" onclick="exportResultsAsCsv(); closeExportModal();" style="justify-content: flex-start; padding: 12px 16px;">
+          <span style="font-size: 18px;">📊</span>
+          <div style="text-align: left; margin-left: 8px;">
+            <div style="font-weight: 700;">Download CSV (Excel / Spreadsheet)</div>
+            <div style="font-size: 11px; opacity: 0.85;">Includes verified distances, phone numbers, addresses, and manager notes.</div>
+          </div>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="exportResultsAsJson(); closeExportModal();" style="justify-content: flex-start; padding: 12px 16px;">
+          <span style="font-size: 18px;">📋</span>
+          <div style="text-align: left; margin-left: 8px;">
+            <div style="font-weight: 700;">Download Location Intelligence JSON</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Schema 1.0 JSON with search center coordinates, perimeter & company metadata.</div>
+          </div>
+        </button>
+        <button type="button" class="btn btn-outline" onclick="handleOpenGoogleSpreadsheet(); closeExportModal();" style="justify-content: flex-start; padding: 12px 16px;">
+          <span style="font-size: 18px;">📊</span>
+          <div style="text-align: left; margin-left: 8px;">
+            <div style="font-weight: 700;">Open Connected Google Spreadsheet ↗</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">View, manage or create spreadsheet in Google Sheets.</div>
+          </div>
+        </button>
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- GOOGLE SPREADSHEET MANAGER MODAL -->
+  <div class="action-modal-backdrop" id="spreadsheet-modal-backdrop" onclick="closeSpreadsheetModal()"></div>
+  <div class="action-modal" id="spreadsheet-modal" style="max-width: 580px;">
+    <div class="action-modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 24px; line-height: 1;">📊</span>
+        <div>
+          <h3 class="action-modal-title">Google Spreadsheet & Data Export</h3>
+          <p class="action-modal-subtitle">Open, copy, or export verified Indian MSME industrial records</p>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeSpreadsheetModal()" title="Close">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <!-- Option 1: Direct Verified 40 Companies CSV Download -->
+        <div class="sheet-action-card" style="border-left: 4px solid var(--brand-blue, #2563eb);">
+          <div class="sheet-action-header">
+            <span class="sheet-action-icon">📥</span>
+            <div>
+              <div class="sheet-action-title">Download Verified 40 Industrial Companies (.CSV)</div>
+              <div class="sheet-action-desc">Guaranteed Excel & Sheets compatible CSV with BOM and all 40 verified columns.</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="exportResultsAsCsv(); closeSpreadsheetModal();" style="width: 100%; justify-content: center; font-weight: 600; padding: 11px;">
+            📥 Download 40 Records (.CSV)
+          </button>
+        </div>
+
+        <!-- Option 2: 1-Click Copy for Google Sheets -->
+        <div class="sheet-action-card" style="border-left: 4px solid #10b981;">
+          <div class="sheet-action-header">
+            <span class="sheet-action-icon">📋</span>
+            <div>
+              <div class="sheet-action-title">Copy 40 Companies for Google Sheets (Paste with Ctrl+V)</div>
+              <div class="sheet-action-desc">Copies formatted tab-delimited columns. Switch to your Google Sheet and press <strong>Ctrl + V</strong>!</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="copyCompaniesForGoogleSheets();" style="flex: 1; justify-content: center; font-weight: 600; padding: 10px;">
+              📋 Copy 40 Rows to Clipboard
+            </button>
+            <a href="https://docs.google.com/spreadsheets/u/0/create" target="_blank" class="btn btn-outline" style="justify-content: center; padding: 10px 14px; text-decoration: none; white-space: nowrap; font-size: 12px;">
+              New Sheet ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- Option 3: Connect Existing Google Spreadsheet URL or ID -->
+        <div class="sheet-action-card" style="background: #f8fafc;">
+          <label style="font-size: 12px; font-weight: 700; color: #1e293b; display: block;">
+            🔗 Connect Existing Google Spreadsheet URL or ID:
+          </label>
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <input type="text" id="input-spreadsheet-url" class="search-input" style="flex: 1; min-width: 0; font-size: 12px; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="Paste Google Sheet URL or ID (e.g. 1Bguq2tU...)" />
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveConnectedSpreadsheet()" style="padding: 0 16px; font-weight: 600; height: 38px; white-space: nowrap;">Save & Open</button>
+          </div>
+          <div id="connected-sheet-status" style="font-size: 11.5px; color: #0284c7; font-weight: 500;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeSpreadsheetModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- TIER CLASSIFICATION CRITERIA GUIDE MODAL -->
+  <div class="action-modal-backdrop" id="tier-guide-modal-backdrop" onclick="closeTierGuideModal()"></div>
+  <div class="action-modal" id="tier-guide-modal" style="max-width: 600px;">
+    <div class="action-modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 24px; line-height: 1;">ℹ️</span>
+        <div>
+          <h3 class="action-modal-title">Industrial Tier Classification Criteria</h3>
+          <p class="action-modal-subtitle">Algorithmic rules for Gold, Silver, and Bronze tier assignment</p>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeTierGuideModal()" title="Close">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Gold Tier -->
+        <div class="tier-guide-card gold">
+          <span style="font-size: 26px; line-height: 1;">⭐</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: #92400e;">GOLD TIER (Flagship OEMs & Major Tier-1 Plants)</div>
+            <div style="font-size: 12px; font-weight: 600; color: #b45309; margin: 2px 0 6px 0;">
+              Rule: Google Rating &ge; 4.5 <span style="margin: 0 4px;">AND</span> Review Count &ge; 100
+            </div>
+            <div style="font-size: 11.5px; color: #475569; line-height: 1.45;">
+              Established market leaders, automotive OEMs, heavy engineering corporations, and ISO-certified manufacturing hubs with highest market reputation and public trust (e.g. Tata Motors, Bharat Forge, SKF India, Sandvik Asia, Forbes Marshall).
+            </div>
+          </div>
+        </div>
+
+        <!-- Silver Tier -->
+        <div class="tier-guide-card silver">
+          <span style="font-size: 26px; line-height: 1;">🛡️</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: #334155;">SILVER TIER (Qualified MSMEs & Precision Tooling Units)</div>
+            <div style="font-size: 12px; font-weight: 600; color: #475569; margin: 2px 0 6px 0;">
+              Rule: Google Rating &ge; 4.0 <span style="margin: 0 4px;">AND</span> Review Count &ge; 25
+            </div>
+            <div style="font-size: 11.5px; color: #475569; line-height: 1.45;">
+              Reliable, verified industrial vendors, component fabricators, CNC machine shops, and certified MSME engineering units with strong operational feedback (e.g. Thermax Boilers, Kalyani Technoforge, Endurance Technologies, KSB Pumps).
+            </div>
+          </div>
+        </div>
+
+        <!-- Bronze Tier -->
+        <div class="tier-guide-card bronze">
+          <span style="font-size: 26px; line-height: 1;">🏭</span>
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: #9a3412;">BRONZE TIER (Emerging Workshops & Specialized Fabricators)</div>
+            <div style="font-size: 12px; font-weight: 600; color: #c2410c; margin: 2px 0 6px 0;">
+              Rule: Rating &lt; 4.0 <span style="margin: 0 4px;">OR</span> Reviews &lt; 25 (or unrated)
+            </div>
+            <div style="font-size: 11.5px; color: #475569; line-height: 1.45;">
+              Emerging job shops, niche fabrication workshops, and micro industrial suppliers that are physically located in the industrial zone but possess a nascent or developing online review presence.
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f1f5f9; border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: #475569; line-height: 1.4;">
+          💡 <strong>Manager Override:</strong> You can click any company row to open the <em>Edit Details Drawer</em> and manually override its Tier category based on your direct business engagement or site inspection.
+        </div>
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeTierGuideModal()">Close Guide</button>
+    </div>
+  </div>
+
+  <!-- API KEY & QUOTA MANAGER MODAL -->
+  <div class="drawer-backdrop" id="api-key-modal-backdrop" onclick="closeApiKeyModal()"></div>
+  <div class="action-modal" id="api-key-modal" style="display: none; max-width: 600px;">
+    <div class="action-modal-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 20px;">🔑</span>
+        <h3 class="action-modal-title">Google Places API Key & Quota Manager</h3>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeApiKeyModal()">✕</button>
+    </div>
+    <div class="action-modal-body">
+      <!-- Current Status Alert -->
+      <div id="api-key-status-box" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px;">
+        <div style="font-weight: 700; font-size: 13px; color: #b45309; display: flex; align-items: center; gap: 6px;">
+          <span>⚠️</span> <span id="api-key-status-title">Daily Quota Status</span>
+        </div>
+        <div id="api-key-status-desc" style="font-size: 11px; color: #78350f; margin-top: 4px; line-height: 1.4;">
+          Project Number: <code>777178574241</code> (Default Unbilled Limit: 100 requests/day).<br>
+          <b>Important:</b> An API Key starts with <code>AIzaSy...</code>. Do not enter your project number.
+        </div>
+      </div>
+
+      <!-- Active Key Input & Actions -->
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <label style="font-size: 12px; font-weight: 700; color: var(--text-primary);">
+          Active Google Maps API Key:
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="input-custom-api-key" class="search-input" style="font-size: 12px; padding: 10px 12px; font-family: monospace;" placeholder="AIzaSy..." />
+          <button type="button" class="btn btn-primary" onclick="saveActiveApiKey()">Save & Use</button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 2px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="testCurrentApiKey()">⚡ Test Key & Quota</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="resetDefaultApiKey()">🔄 Reset to Default Key</button>
+        </div>
+        <div id="api-key-test-feedback" style="font-size: 11px; margin-top: 4px; display: none; padding: 8px; border-radius: var(--radius-sm);"></div>
+      </div>
+
+      <!-- Step-by-Step Guide on How to Get a Free Key or Unlock 10,000+ Searches -->
+      <div style="margin-top: 20px; background: #f8fafc; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+        <div style="font-weight: 700; font-size: 12px; color: var(--text-primary); margin-bottom: 8px;">
+          🚀 How to get unlimited / fresh Google Places API quota (₹0 / Free):
+        </div>
+        <ol style="font-size: 11px; color: var(--text-secondary); margin: 0; padding-left: 18px; line-height: 1.6;">
+          <li><b>Option 1 (Remove 100/day limit completely):</b> Open <a href="https://console.cloud.google.com/billing" target="_blank" style="color: var(--brand-blue); font-weight: 600;">Google Cloud Console Billing ↗</a> and link a billing account. Google gives <b>$200 FREE credit every month</b> (covers 10,000+ searches/mo for ₹0).</li>
+          <li><b>Option 2 (Fresh 100 calls in 1 minute):</b> Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" style="color: var(--brand-blue); font-weight: 600;">Create New Project ↗</a>, enable <b>Places API (New)</b>, create an API Key and paste it above!</li>
+        </ol>
+      </div>
+    </div>
+    <div class="action-modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeApiKeyModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- COMPANY DETAILS & PROFESSIONAL DOSSIER DRAWER -->
+  <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeCompanyDrawer()"></div>
+  <aside class="company-drawer" id="company-drawer">
+    <!-- Executive Cover Banner -->
+    <div class="drawer-cover">
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn-copy-dossier" onclick="copyCompleteCompanyDossier()" title="Copy Full Company Dossier">
+          📋 Copy Dossier
+        </button>
+        <button type="button" class="drawer-cover-close" onclick="closeCompanyDrawer()" title="Close Dossier">✕</button>
+      </div>
+    </div>
+
+    <!-- Header Section with Avatar, Verified Badges, and Details -->
+    <div class="drawer-header-content">
+      <div class="drawer-avatar-wrap">
+        <div class="drawer-avatar" id="drawer-avatar-text">CO</div>
+        <div class="drawer-badge-group">
+          <span class="verified-badge" id="drawer-badge-verified">✓ Google Verified</span>
+          <span class="source-pill live" id="drawer-badge-tier">Tier: Bronze</span>
+          <span class="distance-badge" id="drawer-badge-distance">📍 320 m</span>
+        </div>
+      </div>
+      <h2 class="drawer-title" id="drawer-company-name">Company Name</h2>
+      <div class="drawer-subtitle" id="drawer-company-meta">ID: -- • Industrial Manufacturing</div>
+    </div>
+
+    <!-- Tabs Navigation: Overview / Dossier vs Manager CRM -->
+    <div class="profile-tabs-bar">
+      <button type="button" class="profile-tab-btn active" id="tab-btn-overview" onclick="switchDrawerTab('overview')">
+        🏢 Intelligence Profile
+      </button>
+      <button type="button" class="profile-tab-btn" id="tab-btn-manager" onclick="switchDrawerTab('manager')">
+        ✏️ Manager CRM & Edits
+      </button>
+    </div>
+
+    <!-- Tab 1: Intelligence Profile Body -->
+    <div class="drawer-body" id="drawer-tab-overview">
+      <!-- Quick Action Buttons -->
+      <div class="profile-quick-actions">
+        <a id="drawer-btn-call" href="#" class="profile-action-btn btn-call" target="_blank">
+          <span style="font-size: 20px;">📞</span>
+          <div style="overflow: hidden;">
+            <div style="font-weight: 800; font-size: 13px;">Call Direct</div>
+            <div id="drawer-call-sub" style="font-size: 11px; opacity: 0.85; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Not available</div>
+          </div>
+        </a>
+
+        <a id="drawer-btn-whatsapp" href="#" class="profile-action-btn btn-whatsapp" target="_blank">
+          <span style="font-size: 20px;">💬</span>
+          <div style="overflow: hidden;">
+            <div style="font-weight: 800; font-size: 13px;">WhatsApp Chat</div>
+            <div style="font-size: 11px; opacity: 0.85;">Direct Message ↗</div>
+          </div>
+        </a>
+
+        <a id="drawer-btn-website" href="#" class="profile-action-btn btn-website" target="_blank">
+          <span style="font-size: 20px;">🌐</span>
+          <div style="overflow: hidden;">
+            <div id="drawer-website-title" style="font-weight: 800; font-size: 13px;">Official Website</div>
+            <div id="drawer-website-sub" style="font-size: 11px; opacity: 0.85; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Visit Domain ↗</div>
+          </div>
+        </a>
+
+        <a id="drawer-btn-maps" href="#" class="profile-action-btn btn-maps" target="_blank">
+          <span style="font-size: 20px;">🗺️</span>
+          <div style="overflow: hidden;">
+            <div style="font-weight: 800; font-size: 13px;">Directions / Map</div>
+            <div style="font-size: 11px; opacity: 0.85;">Open in Google Maps ↗</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- Google Rating & Reputation Card -->
+      <div class="profile-card">
+        <div class="profile-card-header">
+          <span style="font-size: 14px;">⭐</span>
+          <span class="profile-card-title">Google Rating & Public Reputation</span>
+        </div>
+        <div class="profile-card-body">
+          <div class="rating-big-box">
+            <div class="rating-score-num" id="drawer-rating-big-num">--</div>
+            <div style="flex: 1;">
+              <div class="rating-stars-gold" id="drawer-rating-stars">★★★★★</div>
+              <div style="font-size: 12px; font-weight: 600; color: #78350f; margin-top: 3px;" id="drawer-rating-count-text">
+                No reviews yet
+              </div>
+            </div>
+            <div>
+              <a id="drawer-rating-link" href="#" target="_blank" class="btn btn-outline btn-sm" style="background: #ffffff; border-color: #fcd34d; font-size: 11px; font-weight: 700; color: #b45309;">
+                Read Reviews ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Corporate & Social Profiles Verification Card -->
+      <div class="profile-card">
+        <div class="profile-card-header">
+          <span style="font-size: 14px;">🔍</span>
+          <span class="profile-card-title">Corporate & Social Verification</span>
+        </div>
+        <div class="profile-card-body">
+          <div class="social-actions-grid">
+            <!-- LinkedIn -->
+            <div class="social-action-card-wrapper">
+              <a id="drawer-social-linkedin" href="#" target="_blank" class="social-action-card">
+                <div class="social-icon" style="color: #0a66c2; font-weight: 800;">in</div>
+                <div style="flex: 1; min-width: 0;">
+                  <div class="social-title">LinkedIn Company Profile</div>
+                  <div class="social-subtitle" id="drawer-linkedin-sub">Search company & employees on LinkedIn ↗</div>
+                </div>
+                <span style="font-size: 12px; color: #94a3b8;">↗</span>
+              </a>
+              <a id="drawer-social-linkedin-google" href="#" target="_blank" class="social-sublink" title="Search Google for indexed LinkedIn Company & Employee profiles">
+                🔍 Google LinkedIn Index Search ↗
+              </a>
+            </div>
+
+            <!-- Instagram -->
+            <a id="drawer-social-instagram" href="#" target="_blank" class="social-action-card">
+              <div class="social-icon" style="color: #e1306c; font-weight: 800;">📸</div>
+              <div style="flex: 1;">
+                <div class="social-title">Instagram Business Search</div>
+                <div class="social-subtitle">Search factory photos, product portfolio & posts ↗</div>
+              </div>
+              <span style="font-size: 12px; color: #94a3b8;">↗</span>
+            </a>
+
+            <!-- ZaubaCorp / MCA Ministry of Corporate Affairs -->
+            <a id="drawer-social-zauba" href="#" target="_blank" class="social-action-card">
+              <div class="social-icon" style="color: #0d9488; font-weight: 800;">🏛️</div>
+              <div style="flex: 1;">
+                <div class="social-title">MCA & ZaubaCorp Registry</div>
+                <div class="social-subtitle">Indian CIN, Directors, Paid Capital & GST status ↗</div>
+              </div>
+              <span style="font-size: 12px; color: #94a3b8;">↗</span>
+            </a>
+
+            <!-- IndiaMART Supplier Catalog -->
+            <a id="drawer-social-indiamart" href="#" target="_blank" class="social-action-card">
+              <div class="social-icon" style="color: #b91c1c; font-weight: 800;">🏭</div>
+              <div style="flex: 1;">
+                <div class="social-title">IndiaMART B2B Catalog</div>
+                <div class="social-subtitle">Search industrial catalog, supplier pricing & quotes ↗</div>
+              </div>
+              <span style="font-size: 12px; color: #94a3b8;">↗</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Factory & Location Intelligence Card -->
+      <div class="profile-card">
+        <div class="profile-card-header" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px;">📍</span>
+            <span class="profile-card-title">Factory & Location Intelligence</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyDrawerAddress()" style="font-size: 11px; padding: 2px 8px;">
+            📋 Copy Address
+          </button>
+        </div>
+        <div class="profile-card-body" style="display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+          <div>
+            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 2px; font-size: 11px;">COMPLETE ADDRESS:</div>
+            <div id="drawer-source-address" style="font-weight: 600; color: var(--text-primary); line-height: 1.4;">--</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+            <div>
+              <div style="font-size: 11px; color: var(--text-secondary);">GPS Coordinates:</div>
+              <div id="drawer-source-coords" style="font-weight: 700; font-family: monospace; font-size: 11px; color: var(--brand-blue);">--</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Distance from Query:</div>
+              <div id="drawer-source-distance" style="font-weight: 700; color: #059669;">--</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+            <div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Data Source:</div>
+              <div id="drawer-source-origin" style="font-weight: 700; color: var(--text-primary);">--</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Google Place ID:</div>
+              <div id="drawer-source-place-id" style="font-weight: 600; font-family: monospace; font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">--</div>
+            </div>
+          </div>
+
+          <div id="drawer-hours-row" style="padding-top: 8px; border-top: 1px solid var(--border-subtle); display: none;">
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Operating Status:</div>
+            <div id="drawer-source-hours" style="font-size: 11px; color: #166534; font-weight: 600;">Open</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Manager CRM & Edits Form -->
+    <div class="drawer-body" id="drawer-tab-manager" style="display: none;">
+      <form id="company-edit-form" onsubmit="saveCompanyEdits(event)">
+        <div class="drawer-section-title">Enterprise CRM & Record Manager</div>
+        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 14px;">
+          Edits saved here immediately update the company dossier and persist directly to your connected Google Sheet.
+        </p>
+
+        <!-- Section 1: Company Information -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">🏢 Company Information</div>
+          <div class="crm-grid-2col">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-company-name">Legal / Corrected Name</label>
+              <input type="text" id="edit-company-name" class="form-control" placeholder="Leave blank to use Google Places name">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-sector">Industrial Sector / Specialization</label>
+              <input type="text" id="edit-sector" class="form-control" placeholder="e.g. Precision CNC, Fabrication, OEM">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Contact Information -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">📞 Contact Information</div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-phone">Verified Contact / Mobile Number</label>
+            <input type="text" id="edit-phone" class="form-control" placeholder="e.g. +91 98765 43210">
+          </div>
+        </div>
+
+        <!-- Section 3: Website & Online Presence -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">🌐 Website & Online Presence</div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-website">Official Website URL</label>
+            <input type="url" id="edit-website" class="form-control" placeholder="https://companywebsite.com">
+          </div>
+        </div>
+
+        <!-- Section 4: Lead Classification & Status -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">🏷️ Lead Classification & Status</div>
+          <div class="crm-grid-2col" style="margin-bottom: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-verification">Verification Status</label>
+              <select id="edit-verification" class="form-control">
+                <option value="Verified">Verified by Team (Confirmed Factory)</option>
+                <option value="Unverified">Unverified (Pending Tele-Call)</option>
+                <option value="Needs Review">Needs Review (Potential Trader/Residential)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-tier">Manager Lead Tier</label>
+              <select id="edit-tier" class="form-control">
+                <option value="">Auto Tier (Based on Reviews)</option>
+                <option value="Gold">Gold Tier (High Priority OEM)</option>
+                <option value="Silver">Silver Tier (Qualified MSME)</option>
+                <option value="Bronze">Bronze Tier (Basic Workshop)</option>
+              </select>
+            </div>
+          </div>
+          <div class="crm-grid-2col">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-followup-status">Lead CRM Status</label>
+              <select id="edit-followup-status" class="form-control">
+                <option value="New">New Lead</option>
+                <option value="Contacted">Contacted</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Qualified">Qualified</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-lead-priority">Lead Priority</label>
+              <select id="edit-lead-priority" class="form-control">
+                <option value="High">High Priority</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Ownership & Follow-up -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">👤 Ownership & Follow-up</div>
+          <div class="crm-grid-2col">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-assigned-to">Lead Owner / Assignee</label>
+              <input type="text" id="edit-assigned-to" class="form-control" placeholder="e.g. Sales Rep / Manager Name">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="edit-followup-date">Next Follow-Up Date</label>
+              <input type="date" id="edit-followup-date" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 6: Internal CRM Notes -->
+        <div class="crm-form-section">
+          <div class="crm-section-title">📝 Internal CRM & Call Notes</div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <textarea id="edit-notes" class="form-control" rows="4" placeholder="Log telephonic conversations, director names, machinery specs, procurement requirements..."></textarea>
+          </div>
+        </div>
+
+        <div class="drawer-footer" style="margin-top: 16px; padding: 12px 0;">
+          <button type="button" class="btn btn-secondary" onclick="closeCompanyDrawer()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-drawer">💾 Save Changes to Google Sheets</button>
+        </div>
+      </form>
+    </div>
+  </aside>
+
+  <!-- LOCATION JSON MODAL -->
+  <div class="drawer-backdrop" id="json-modal-backdrop" onclick="closeLocationJsonModal()"></div>
+  <div class="advanced-options-card" id="json-viewer-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 720px; max-width: 92vw; max-height: 85vh; z-index: 110; box-shadow: var(--shadow-xl); overflow: hidden; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle);">
+      <h3 style="font-size: 14px; font-weight: 700;">Location Intelligence JSON (Schema 1.0)</h3>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeLocationJsonModal()">✕</button>
+    </div>
+    <div style="flex: 1; overflow-y: auto; margin: 12px 0;">
+      <pre id="json-display-pre" style="background: #0f172a; color: #38bdf8; padding: 14px; border-radius: var(--radius-md); font-family: monospace; font-size: 11px; white-space: pre-wrap; max-height: 55vh; overflow-y: auto;"></pre>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-subtle);">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="copyLocationJson()">Copy JSON</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="exportResultsAsJson()">Download JSON File</button>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px;"></div>
+
+  <?!= include('Scripts'); ?>
+</body>
+</html>
