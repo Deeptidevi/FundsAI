@@ -5,6 +5,8 @@ import {
   DashboardMetrics,
   CompanyKnowledgeItem,
   ImportSummary,
+  ExportJob,
+  ExportBatch,
 } from '@gmaps/shared';
 
 const API_BASE = '/api';
@@ -449,4 +451,155 @@ export const api = {
     if (!res.ok) throw new Error(data.error || 'Failed to toggle AI mode');
     return data;
   },
+
+  // --- EXCEL EXPORT & AI DASHBOARD WEBHOOK ---
+  async exportCompaniesExcel(params: {
+    companyIds?: string[];
+    status?: string;
+    city?: string;
+    tier?: string;
+    datasetName?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(`${API_BASE}/export/workbook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Export failed' }));
+      throw new Error(err.error || 'Failed to download Excel file');
+    }
+
+    const disposition = res.headers.get('Content-Disposition') || '';
+    let filename = 'fundsai_export_complete.xlsx';
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    if (match && match[1]) {
+      filename = match[1];
+    }
+
+    const blob = await res.blob();
+    return { blob, filename };
+  },
+
+  async startWebhookTransfer(params: {
+    companyIds?: string[];
+    status?: string;
+    city?: string;
+    tier?: string;
+    customWebhookUrl?: string;
+  }): Promise<{
+    success: boolean;
+    exportId: string;
+    totalRecords: number;
+    totalBatches: number;
+    batchSize: number;
+    targetWebhookUrl: string;
+    job: ExportJob;
+  }> {
+    const res = await fetch(`${API_BASE}/export/webhook/dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start webhook transfer');
+    return data;
+  },
+
+  async getWebhookTransferStatus(exportId: string): Promise<{ job: ExportJob }> {
+    const res = await fetch(`${API_BASE}/export/status/${exportId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch transfer status');
+    return data;
+  },
+
+  async retryFailedBatches(exportId: string): Promise<{ success: boolean; job: ExportJob }> {
+    const res = await fetch(`${API_BASE}/export/retry/${exportId}`, {
+      method: 'POST',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to retry failed batches');
+    return data;
+  },
+
+  async cancelWebhookTransfer(exportId: string): Promise<{ success: boolean; job: ExportJob }> {
+    const res = await fetch(`${API_BASE}/export/cancel/${exportId}`, {
+      method: 'POST',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to cancel transfer');
+    return data;
+  },
+
+  async getExportConfig(): Promise<{
+    isConfigured: boolean;
+    configured?: boolean;
+    webhookUrl?: string;
+    batchSize: number;
+    timeoutMs: number;
+    maxRetries: number;
+    hasSecretConfigured: boolean;
+    hasBearerTokenConfigured: boolean;
+  }> {
+    const res = await fetch(`${API_BASE}/export/config`);
+    const data = await res.json();
+    if (!res.ok) throw new Error('Failed to fetch export configuration');
+    return data;
+  },
+
+
+  async saveBatchLeads(params: {
+    places: any[];
+    searchAnchor?: string;
+    searchRadiusKm?: number;
+    searchQuery?: string;
+  }): Promise<{
+    success: boolean;
+    totalReceived: number;
+    newlyCreated: number;
+    existingCount: number;
+    leadIds: string[];
+    message: string;
+  }> {
+    const res = await fetch(`${API_BASE}/leads/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save batch leads');
+    return data;
+  },
+
+  async exportPlacesExcel(params: {
+    places: any[];
+    anchorName?: string;
+    radiusKm?: number;
+    searchQuery?: string;
+    datasetName?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(`${API_BASE}/export/places-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Excel generation failed');
+    }
+
+    const disposition = res.headers.get('content-disposition');
+    let filename = 'GMAPS_Industrial_Companies_Export.xlsx';
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) filename = match[1];
+    }
+
+    const blob = await res.blob();
+    return { blob, filename };
+  },
 };
+

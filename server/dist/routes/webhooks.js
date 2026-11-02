@@ -78,3 +78,104 @@ webhooksRouter.post('/email', async (c) => {
     }
     return c.json({ status: 'ok' });
 });
+/**
+ * Mock External AI Agent Dashboard Webhook Receiver
+ * Emulates the exact receiver contract expected by the external dashboard.
+ * Supports simulate query params (?simulate=error, ?simulate=rate_limit, ?simulate=delay) for testing.
+ */
+webhooksRouter.post('/mock-ai-dashboard', async (c) => {
+    const simulate = c.req.query('simulate');
+    if (simulate === 'error') {
+        return c.json({ error: 'Simulated internal server error from AI Dashboard receiver' }, 500);
+    }
+    if (simulate === 'rate_limit') {
+        return c.json({ error: 'Simulated rate limit exceeded from AI Dashboard receiver' }, 429);
+    }
+    if (simulate === 'duplicate') {
+        return c.json({
+            success: true,
+            status: 'DUPLICATE_ACKNOWLEDGED',
+            message: 'Batch already received and processed. Duplicate upload acknowledged.',
+        }, 409);
+    }
+    if (simulate === 'checksum_mismatch') {
+        return c.json({
+            success: false,
+            error: 'CHECKSUM_MISMATCH',
+            message: 'Computed SHA-256 does not match metadata checksumSha256.',
+        }, 400);
+    }
+    if (simulate === 'unauthorized') {
+        return c.json({
+            success: false,
+            error: 'INVALID_AUTHENTICATION',
+            message: 'Bearer token or signature mismatch.',
+        }, 401);
+    }
+    if (simulate === 'delay') {
+        await new Promise((resolve) => setTimeout(resolve, 3500));
+    }
+    try {
+        const body = await c.req.parseBody();
+        const file = (body['file'] || body['excel_file']);
+        const exportId = body['export_id'];
+        const batchId = body['batch_id'];
+        const batchNumber = parseInt(body['batch_number'] || '1', 10);
+        const totalBatches = parseInt(body['total_batches'] || '1', 10);
+        const recordCount = parseInt(body['record_count'] || '0', 10);
+        const idempotencyKey = body['idempotency_key'];
+        const checksumSha256 = body['checksum_sha256'];
+        if (!exportId || !batchId || !idempotencyKey) {
+            return c.json({
+                error: 'Missing required webhook batch metadata (export_id, batch_id, idempotency_key).',
+            }, 400);
+        }
+        let fileSize = 0;
+        let fileName = 'unknown.xlsx';
+        if (file && typeof file !== 'string' && file instanceof File) {
+            fileSize = file.size;
+            fileName = file.name;
+        }
+        // Verify HMAC header if secret is configured in receiver
+        const webhookSecret = process.env.AI_DASHBOARD_SIGNING_SECRET || process.env.AI_DASHBOARD_WEBHOOK_SECRET;
+        const rawSignature = c.req.header('X-FundsAI-Signature') || c.req.header('X-Signature-SHA256');
+        const receivedSignature = rawSignature ? rawSignature.replace(/^sha256=/, '') : null;
+        if (webhookSecret && receivedSignature) {
+            const timestamp = body['timestamp'] || '';
+            const canonicalString = `${checksumSha256 || ''}:${batchId}:${timestamp}`;
+            const legacyPayload = `${exportId}:${batchId}:${idempotencyKey}:${checksumSha256 || ''}`;
+            const hmacCanonical = (await import('node:crypto')).default
+                .createHmac('sha256', webhookSecret)
+                .update(canonicalString)
+                .digest('hex');
+            const hmacLegacy = (await import('node:crypto')).default
+                .createHmac('sha256', webhookSecret)
+                .update(legacyPayload)
+                .digest('hex');
+            if (receivedSignature !== hmacCanonical && receivedSignature !== hmacLegacy) {
+                return c.json({ error: 'Unauthorized: Webhook signature mismatch.' }, 401);
+            }
+        }
+        console.log(`[AI Dashboard Mock Receiver] Acknowledged Batch ${batchNumber}/${totalBatches} (${recordCount} records, file: ${fileName}, ${fileSize} bytes)`);
+        return c.json({
+            success: true,
+            status: 'ACKNOWLEDGED',
+            acknowledged: true,
+            batch_id: batchId,
+            export_id: exportId,
+            batch_number: batchNumber,
+            total_batches: totalBatches,
+            received_records: recordCount,
+            file_name: fileName,
+            file_size_bytes: fileSize,
+            checksum_sha256: checksumSha256,
+            receiver_service: 'External AI Agent Dashboard Mock Receiver',
+            timestamp: new Date().toISOString(),
+        });
+    }
+    catch (err) {
+        return c.json({
+            error: `Mock receiver failed to process batch: ${err instanceof Error ? err.message : String(err)}`,
+        }, 400);
+    }
+});

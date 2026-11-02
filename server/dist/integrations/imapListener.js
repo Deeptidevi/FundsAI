@@ -76,6 +76,10 @@ export class ImapListener {
             auth: { user, pass },
             logger: false,
         });
+        // Prevent unhandled error event crash on socket ECONNRESET / network drops
+        client.on('error', (err) => {
+            console.warn('[IMAP Listener] Socket warning (handled):', err.message);
+        });
         let processedCount = 0;
         let matchedCount = 0;
         try {

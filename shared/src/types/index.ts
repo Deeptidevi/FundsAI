@@ -275,3 +275,75 @@ export interface AiDecisionLog {
   actionTaken: 'auto_replied' | 'human_escalated' | 'opted_out' | 'followup_scheduled';
   createdAt: string;
 }
+
+// --- EXPORT & AI DASHBOARD WEBHOOK TYPES ---
+export type ExportJobType = 'excel_download' | 'ai_dashboard_webhook';
+export type ExportJobStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+export type ExportBatchStatus = 'pending' | 'in_progress' | 'success' | 'retrying' | 'failed' | 'cancelled';
+
+export interface ExportJob {
+  id: string;
+  exportType: ExportJobType;
+  status: ExportJobStatus;
+  totalRecords: number;
+  batchSize: number;
+  totalBatches: number;
+  successfulBatches: number;
+  failedBatches: number;
+  deliveredRecords: number;
+  targetWebhookUrl?: string;
+  idempotencyKey?: string;
+  errorMessage?: string;
+  metadata?: Record<string, unknown>;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  batches?: ExportBatch[];
+}
+
+export interface ExportBatch {
+  id: string;
+  exportJobId: string;
+  batchNumber: number;
+  totalBatches: number;
+  recordStartIndex: number;
+  recordEndIndex: number;
+  recordCount: number;
+  companyIds: string[];
+  status: ExportBatchStatus;
+  retryCount: number;
+  maxRetries: number;
+  idempotencyKey: string;
+  checksumSha256?: string;
+  httpStatus?: number;
+  errorMessage?: string;
+  acknowledgementData?: Record<string, unknown>;
+  sentAt?: string;
+  acknowledgedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebhookBatchMetadata {
+  exportId: string;
+  batchId: string;
+  batchNumber: number;
+  totalBatches: number;
+  batchRecordCount: number;
+  totalRecordCount: number;
+  schemaVersion: string;
+  fileName: string;
+  checksumSha256: string;
+  timestamp: string;
+  senderSystem: string;
+  source?: string;
+  // Backward compatibility fields
+  totalRecords?: number;
+  recordCount?: number;
+  idempotencyKey?: string;
+  batchRecordStart?: number;
+  batchRecordEnd?: number;
+}
+
+

@@ -30,7 +30,12 @@ import {
   Boxes,
   Truck,
   Car,
+  Send,
+  CheckSquare,
+  Square,
+  Loader2,
 } from 'lucide-react';
+import { ExportDeliveryModal } from '../components/ExportDeliveryModal';
 
 interface IndustrialHubPreset {
   name: string;
@@ -128,6 +133,15 @@ export const IndustrialSearch: React.FC = () => {
   // Lead saving state
   const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
   const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+
+  // Company Selection & Webhook Export State
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<Set<string>>(new Set());
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [startingWebhook, setStartingWebhook] = useState(false);
+  const [activeExportJobId, setActiveExportJobId] = useState<string | null>(null);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
   // API Status & Quota Dialog
   const [apiStatus, setApiStatus] = useState<{
@@ -315,45 +329,45 @@ export const IndustrialSearch: React.FC = () => {
 
     try {
       setSavingPlaceId(place.placeId);
-      await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: place.name,
-          phone: place.phone || null,
-          address: place.address || null,
-          city: 'Pune',
-          state: 'Maharashtra',
-          tier: place.tier || 'Bronze',
-          rating: place.rating || null,
-          reviewCount: place.reviewCount || 0,
-          source: 'Google Places Discovery',
-          status: 'PROSPECT',
-          priority: place.tier === 'Gold' ? 'HIGH' : place.tier === 'Silver' ? 'MEDIUM' : 'NORMAL',
-          customFields: {
-            placeId: place.placeId,
-            distanceKm: place.distanceKm,
-            coordinates: place.location,
-            phoneType: place.phoneType,
-          },
-        }),
+      await api.saveBatchLeads({
+        places: [place],
+        searchAnchor: anchorName,
+        searchRadiusKm: radiusKm,
+        searchQuery: selectedCategory === 'custom' ? customKeyword : selectedCategory,
       });
 
       setSavedPlaceIds((prev) => new Set([...prev, place.placeId]));
+      setSaveFeedback(`✓ Saved "${place.name}" to Leads CRM!`);
+      setTimeout(() => setSaveFeedback(null), 4000);
     } catch (err) {
       console.error('Failed to save lead:', err);
+      alert(`Save lead failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSavingPlaceId(null);
     }
   };
 
-  // 8. Save All Discovered Businesses to CRM
+  // 8. Save All Discovered Businesses to CRM (Atomic SQLite Batch Transaction)
   const handleSaveAllToLeads = async () => {
-    const unsaved = results.filter((p) => !savedPlaceIds.has(p.placeId));
-    if (unsaved.length === 0) return;
+    if (results.length === 0) return;
 
-    for (const place of unsaved) {
-      await handleSaveToLeads(place);
+    try {
+      setIsSavingAll(true);
+      setSaveFeedback(null);
+      const res = await api.saveBatchLeads({
+        places: results,
+        searchAnchor: anchorName,
+        searchRadiusKm: radiusKm,
+        searchQuery: selectedCategory === 'custom' ? customKeyword : selectedCategory,
+      });
+
+      setSavedPlaceIds(new Set(results.map((p) => p.placeId)));
+      setSaveFeedback(`✓ ${res.message || `Successfully saved all ${results.length} companies to Leads CRM!`}`);
+      setTimeout(() => setSaveFeedback(null), 8000);
+    } catch (err: unknown) {
+      alert(`Save All failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSavingAll(false);
     }
   };
 
@@ -398,6 +412,153 @@ export const IndustrialSearch: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Selection Toggle Handlers
+  const handleToggleSelectPlace = (placeId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedPlaceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(placeId)) {
+        next.delete(placeId);
+      } else {
+        next.add(placeId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedPlaceIds.size === filteredResults.length && filteredResults.length > 0) {
+      setSelectedPlaceIds(new Set());
+    } else {
+      setSelectedPlaceIds(new Set(filteredResults.map((p) => p.placeId)));
+    }
+  };
+
+  // Synchronize selected places into CRM database and return their lead IDs
+  const ensureSelectedPlacesInDb = async (placeIds: string[]): Promise<string[]> => {
+    const selected = results.filter((p) => placeIds.includes(p.placeId));
+    const leadIds: string[] = [];
+
+    for (const place of selected) {
+      try {
+        const res = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyName: place.name,
+            placeId: place.placeId,
+            phone: place.phone || null,
+            phoneType: place.phoneType || null,
+            address: place.address || null,
+            city: 'Pune',
+            state: 'Maharashtra',
+            tier: place.tier || 'Bronze',
+            rating: place.rating || null,
+            reviewCount: place.reviewCount || 0,
+            source: 'Google Places Discovery',
+            status: 'PROSPECT',
+            priority: place.tier === 'Gold' ? 'HIGH' : place.tier === 'Silver' ? 'MEDIUM' : 'NORMAL',
+            website: place.website || null,
+            googleMapsUrl: place.googleMapsUri || null,
+            customFields: {
+              placeId: place.placeId,
+              distanceKm: place.distanceKm,
+              coordinates: place.location,
+              phoneType: place.phoneType,
+            },
+          }),
+        });
+        const data = await res.json();
+        if (data.leadId) {
+          leadIds.push(data.leadId);
+          setSavedPlaceIds((prev) => new Set([...prev, place.placeId]));
+        }
+      } catch (err) {
+        console.error('Failed to sync place to leads:', err);
+      }
+    }
+
+    return leadIds;
+  };
+
+  // Export Selected or All Discovered Companies as Professional Excel Workbook
+  const handleExportExcel = async () => {
+    const placesToExport = selectedPlaceIds.size > 0
+      ? results.filter((p) => selectedPlaceIds.has(p.placeId))
+      : filteredResults.length > 0 ? filteredResults : results;
+
+    if (placesToExport.length === 0) {
+      alert('No industrial companies available to export. Search or discover companies first.');
+      return;
+    }
+
+    try {
+      setExportingExcel(true);
+      const { blob, filename } = await api.exportPlacesExcel({
+        places: placesToExport,
+        anchorName,
+        radiusKm,
+        searchQuery: selectedCategory === 'custom' ? customKeyword : selectedCategory,
+        datasetName: `G-MAPS Industrial Export - ${anchorName} (${placesToExport.length} Companies, ${radiusKm}km)`,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Simultaneously ensure all exported companies are saved to Leads CRM
+      api.saveBatchLeads({
+        places: placesToExport,
+        searchAnchor: anchorName,
+        searchRadiusKm: radiusKm,
+      }).then(() => {
+        setSavedPlaceIds((prev) => new Set([...prev, ...placesToExport.map((p) => p.placeId)]));
+      }).catch(console.error);
+
+    } catch (err: unknown) {
+      alert(`Excel export failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  // Send Selected or All Companies to AI Dashboard in Batches of 100 via Webhook
+  const handleSendToAiDashboard = async () => {
+    const placesToSend = selectedPlaceIds.size > 0
+      ? results.filter((p) => selectedPlaceIds.has(p.placeId))
+      : filteredResults.length > 0 ? filteredResults : results;
+
+    if (placesToSend.length === 0) {
+      alert('No industrial companies available to transfer. Search or discover companies first.');
+      return;
+    }
+
+    try {
+      setStartingWebhook(true);
+      // Fast atomic batch save to CRM to ensure lead IDs are persisted
+      const batchRes = await api.saveBatchLeads({
+        places: placesToSend,
+        searchAnchor: anchorName,
+        searchRadiusKm: radiusKm,
+      });
+
+      setSavedPlaceIds((prev) => new Set([...prev, ...placesToSend.map((p) => p.placeId)]));
+
+      const res = await api.startWebhookTransfer({ companyIds: batchRes.leadIds });
+      setActiveExportJobId(res.exportId);
+      setIsDeliveryModalOpen(true);
+    } catch (err: unknown) {
+      alert(`Webhook transfer failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setStartingWebhook(false);
+    }
   };
 
   // 10. Filter & Sort Table Results
@@ -912,11 +1073,20 @@ export const IndustrialSearch: React.FC = () => {
                   <AlertCircle size={14} />
                   <span>Zero Results Diagnostic Report:</span>
                 </div>
-                <p className="text-slate-300">
-                  {diagnostics.totalRawResults === 0
-                    ? `Google Places returned 0 places for queries "${diagnostics.queriesExecuted.join(', ')}" within ${diagnostics.radiusKm} km of this location.`
-                    : `Google returned ${diagnostics.totalRawResults} places, but all were excluded as consumer businesses (shops, restaurants) or fell outside the strict ${diagnostics.radiusKm} km boundary.`}
-                </p>
+                {diagnostics.errorMessage ? (
+                  <div className="p-2 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 space-y-1">
+                    <div className="font-bold">⚠️ Google Places API Error: {diagnostics.errorMessage}</div>
+                    <div className="text-[11px] text-slate-300">
+                      Your Google Places API key in <code>server/.env</code> returned an error. If expired, please renew or create a new key in Google Cloud Console and update <code>GOOGLE_PLACES_API_KEY</code>.
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-300">
+                    {diagnostics.totalRawResults === 0
+                      ? `Google Places returned 0 places for queries "${diagnostics.queriesExecuted.join(', ')}" within ${diagnostics.radiusKm} km of this location.`
+                      : `Google returned ${diagnostics.totalRawResults} places, but all were excluded as consumer businesses (shops, restaurants) or fell outside the strict ${diagnostics.radiusKm} km boundary.`}
+                  </p>
+                )}
                 <div className="text-[11px] text-amber-400 pt-1">
                   💡 <strong>Suggested Actions:</strong> Try expanding radius to <strong>10 km</strong> or <strong>25 km</strong>, switch to "All Manufacturing & Industrial MSMEs", or select a major MIDC hub (Bhosari / Chakan).
                 </div>
@@ -943,6 +1113,45 @@ export const IndustrialSearch: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {selectedPlaceIds.size > 0 && (
+              <span className="px-2.5 py-1.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center gap-1.5">
+                <CheckSquare size={13} />
+                <span>{selectedPlaceIds.size} Selected</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlaceIds(new Set())}
+                  className="ml-1 text-slate-400 hover:text-white text-xs underline"
+                >
+                  Clear
+                </button>
+              </span>
+            )}
+
+            {/* Complete Detailed Excel Export - ALWAYS VISIBLE */}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={results.length === 0 || exportingExcel}
+              title="Download comprehensive, formatted Excel (.xlsx) workbook with all companies, sequence numbers, contacts, and radius metrics"
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+            >
+              {exportingExcel ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              <span>{selectedPlaceIds.size > 0 ? `Export Selected Excel (${selectedPlaceIds.size})` : `Export Excel (${filteredResults.length} Units)`}</span>
+            </button>
+
+            {/* Send to AI Agent Dashboard - ALWAYS VISIBLE */}
+            <button
+              type="button"
+              onClick={handleSendToAiDashboard}
+              disabled={results.length === 0 || startingWebhook}
+              title="Transfer companies to external AI Agent Dashboard in batches of 100 via secure webhook"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer"
+            >
+              {startingWebhook ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              <span>{selectedPlaceIds.size > 0 ? `Send Selected (${selectedPlaceIds.size}) to AI Dashboard` : `Send to AI Dashboard (${filteredResults.length})`}</span>
+            </button>
+
+            {/* Download CSV */}
             <button
               type="button"
               onClick={handleExportCsv}
@@ -953,17 +1162,44 @@ export const IndustrialSearch: React.FC = () => {
               <span>Download CSV</span>
             </button>
 
+            {/* Save All to Leads CRM - FAST ATOMIC BATCH */}
             <button
               type="button"
               onClick={handleSaveAllToLeads}
-              disabled={results.length === 0}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-blue-600/20"
+              disabled={results.length === 0 || isSavingAll}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
             >
-              <CheckCircle2 size={13} />
-              <span>Save All to Leads</span>
+              {isSavingAll ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Saving {filteredResults.length} Leads...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={13} />
+                  <span>Save All to Leads ({filteredResults.length})</span>
+                </>
+              )}
             </button>
           </div>
         </div>
+
+        {/* Real-time Save Feedback Notification Banner */}
+        {saveFeedback && (
+          <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+              <span>{saveFeedback}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSaveFeedback(null)}
+              className="text-emerald-400 hover:text-white text-xs px-2 py-0.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Filter & Sort Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1023,6 +1259,14 @@ export const IndustrialSearch: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900/90 text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-800">
               <tr>
+                <th className="py-3 px-3 w-8 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlaceIds.size > 0 && selectedPlaceIds.size === filteredResults.length}
+                    onChange={handleToggleSelectAll}
+                    className="rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                </th>
                 <th className="py-3 px-3 w-10">#</th>
                 <th className="py-3 px-3">Company Name</th>
                 <th className="py-3 px-3">Tier</th>
@@ -1037,7 +1281,7 @@ export const IndustrialSearch: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60 font-normal">
               {filteredResults.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                  <td colSpan={10} className="py-12 text-center text-slate-500">
                     {loading ? (
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -1059,6 +1303,14 @@ export const IndustrialSearch: React.FC = () => {
 
                   return (
                     <tr key={p.placeId} className="hover:bg-slate-800/30 transition">
+                      <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedPlaceIds.has(p.placeId)}
+                          onChange={() => handleToggleSelectPlace(p.placeId)}
+                          className="rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">{idx + 1}</td>
                       <td className="py-3 px-3">
                         <div className="font-bold text-white text-xs">{p.name}</div>
@@ -1247,6 +1499,13 @@ export const IndustrialSearch: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delivery Tracking & Webhook Batch Progress Modal */}
+      <ExportDeliveryModal
+        isOpen={isDeliveryModalOpen}
+        exportId={activeExportJobId}
+        onClose={() => setIsDeliveryModalOpen(false)}
+      />
     </div>
   );
 };

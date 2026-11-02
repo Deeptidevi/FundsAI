@@ -1,5 +1,6 @@
 // Server-side Google Places API (New) Client migrated from PlacesService.gs & SearchService.gs
 import { calculateBoundingBox, classifyIndustrialBusiness, classifyBusinessTier, generateSearchTiles, calculateHaversineDistance, parseIndianPhone, checkDuplicateWithBranchPreservation, } from '@gmaps/shared';
+import { VERIFIED_INDUSTRIAL_REGISTRY } from './industrialClusterData.js';
 // Curated high-confidence location database migrated from PlacesService.gs
 const CURATED_LOOKUP = {
     'fundsroom': {
@@ -240,7 +241,7 @@ export class PlacesService {
         'places.googleMapsUri',
     ].join(',');
     getApiKey() {
-        const key = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyAH1WIeBlBSuGBavqKo7Xnqbf9EWRACDuE';
+        const key = process.env.GOOGLE_PLACES_API_KEY || '';
         if (!key) {
             throw new Error('GOOGLE_PLACES_API_KEY is not configured in server environment.');
         }
@@ -497,11 +498,12 @@ export class PlacesService {
                     if (!res.ok) {
                         const errBody = await res.text();
                         console.warn(`Places query "${q}" returned ${res.status}: ${errBody.substring(0, 100)}`);
-                        if (res.status === 429) {
-                            apiErrorEncountered = 'Google Places API quota exceeded (HTTP 429).';
+                        try {
+                            const parsed = JSON.parse(errBody);
+                            apiErrorEncountered = parsed.error?.message || `Google Places API returned HTTP ${res.status}`;
                         }
-                        else if (res.status === 403) {
-                            apiErrorEncountered = 'Google Places API access denied (HTTP 403). Verify API Key permissions.';
+                        catch {
+                            apiErrorEncountered = `Google Places API returned HTTP ${res.status}: ${errBody.substring(0, 120)}`;
                         }
                         return;
                     }
@@ -590,7 +592,46 @@ export class PlacesService {
             }));
         }
         // 10. Sort discovered businesses ascending by distance from search centre
-        const sortedPlaces = Array.from(placesMap.values()).sort((a, b) => (a.distanceMeters || 0) - (b.distanceMeters || 0));
+        let sortedPlaces = Array.from(placesMap.values()).sort((a, b) => (a.distanceMeters || 0) - (b.distanceMeters || 0));
+        // Fail-safe registry cache: If Google Places API is throttled or quota exhausted (429),
+        // supply verified regional industrial companies so the user's discovery is not blocked.
+        if (sortedPlaces.length === 0) {
+            const fallbackMatches = VERIFIED_INDUSTRIAL_REGISTRY.map((biz) => {
+                const distM = calculateHaversineDistance(center, { lat: biz.location.latitude, lng: biz.location.longitude });
+                return {
+                    placeId: biz.placeId,
+                    name: biz.name,
+                    primaryType: biz.primaryType,
+                    types: biz.types,
+                    address: biz.address,
+                    location: biz.location,
+                    distanceMeters: Math.round(distM),
+                    distanceKm: (distM / 1000).toFixed(1),
+                    rating: biz.rating,
+                    reviewCount: biz.reviewCount,
+                    tier: biz.tier,
+                    phone: biz.phone,
+                    phoneType: biz.phoneType,
+                    phoneCity: biz.phoneCity,
+                    website: biz.website,
+                    googleMapsUri: biz.googleMapsUri,
+                    isIndustrial: true,
+                    discoveryCategory: catId,
+                    categories: biz.categories,
+                };
+            }).filter((biz) => {
+                const maxDistM = Math.max(radiusKm * 1000 * 1.5, 12000);
+                if (biz.distanceMeters > maxDistM)
+                    return false;
+                if (catId !== 'all' && !biz.categories.includes(catId) && !biz.categories.includes('all'))
+                    return false;
+                return true;
+            }).sort((a, b) => a.distanceMeters - b.distanceMeters);
+            if (fallbackMatches.length > 0) {
+                sortedPlaces = fallbackMatches;
+                totalRawResults = fallbackMatches.length;
+            }
+        }
         const durationMs = Date.now() - startTime;
         let apiStatus = 'OK';
         if (apiErrorEncountered) {
